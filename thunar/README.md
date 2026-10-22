@@ -17,8 +17,9 @@ the same contents and the new import; the linked source is left untouched. To ke
 stylesheet, add `@import url("noctalia-thunar.css");` to its source instead. The hook recognizes
 that import and then leaves `gtk.css` unchanged.
 
-Disabling or removing the template does not remove the import or generated stylesheet. To undo it,
-remove the import from `gtk.css` and delete `noctalia-thunar.css`.
+Disabling the template runs `undo.sh`, which removes the `@import` from `gtk.css` (leaving the rest
+of your stylesheet intact) and deletes `noctalia-thunar.css`. If `gtk.css` is a read-only managed symlink
+(such as under Home Manager), the hook leaves the symlink untouched.
 
 ## Menus and context menus
 
