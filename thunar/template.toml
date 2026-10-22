@@ -1,0 +1,8 @@
+[catalog.thunar]
+name = "Thunar"
+category = "system"
+
+[templates.thunar]
+input_path = "thunar.css"
+output_path = "$XDG_CONFIG_HOME/gtk-3.0/noctalia-thunar.css"
+post_hook = "bash '{{ config_dir }}/apply.sh'"
