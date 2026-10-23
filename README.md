@@ -56,6 +56,7 @@ Beyond the basics:
 | `undo_hook` | Shell run when the user disables the template (or all community templates), to remove what `post_hook` added to the app's config. Retried on the next theme change until it exits 0. |
 | `post_action` | Named noctalia built-in after the write (not shell). Currently: `firefox-theme`. |
 | `requires_path` | Skip the entry unless this path exists, so one template can ship entries for apps a user may not have. |
+| `gtk_extension` | `"gtk3"` or `"gtk4"`: the entry is app-scoped CSS for a GTK app. See [GTK apps](#gtk-apps). |
 
 Output paths expand a leading `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME`, `$XDG_STATE_HOME`, `$XDG_CACHE_HOME`, or `~`.
 
@@ -63,6 +64,29 @@ Output paths expand a leading `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME`, `$XDG_STATE_
 own, and `{{ config_dir }}` points at it, so a hook names a file you ship directly: `bash '{{ config_dir }}/apply.sh'`.
 It is not the repo root, and not the app's config directory. CI rejects a hook that reaches for a file the template
 does not ship.
+
+## GTK apps
+
+GTK apps (Thunar, …) already follow Noctalia's built-in GTK 3/GTK 4 theming. When an app still needs its own CSS, ship
+it as a **GTK extension** instead of editing `gtk.css`:
+
+```toml
+[templates.thunar]
+input_path    = "thunar.css"
+gtk_extension = "gtk3"
+```
+
+Noctalia renders the CSS into its own `noctalia-extensions/` folder next to `gtk.css` and imports it through the built-in
+GTK template, so it loads only while that GTK version's built-in template is enabled and disappears when either is turned
+off. An extension entry sets no `output_path`, hooks, or `post_action`; CI rejects them. Never write to `gtk.css` from a
+hook: it is shared by every GTK app and by the built-in template.
+
+Scope every selector to the app (`window.thunar`, `.thunar …`) so the CSS cannot leak into other GTK apps. Rules in an
+extension load at the user-stylesheet priority, so they win over the GTK theme without fighting over load order, and they
+can use the built-in palette's named colors (`@accent_bg_color`, `@window_bg_color`, …) as well as `{{ colors.* }}`.
+
+To try one before opening a PR, render it as a user template to any path and `@import` that file from your own `gtk.css`
+temporarily.
 
 ## Writing the template body
 
@@ -90,7 +114,8 @@ time the theme changes. Rendering a file is inert; a hook is not. So:
 - Fail loudly when the app's config is missing (non-zero exit, message on stderr) instead of creating something the user
   never asked for.
 - Download nothing, and execute nothing you did not ship in this directory.
-- Touch only that app's own config.
+- Touch only that app's own config. Shared files such as GTK's `gtk.css` are off limits; use a
+  [GTK extension](#gtk-apps) instead.
 - If `post_hook` edits the app's config (an include, a theme selection), ship an `undo_hook` that reverts exactly that
   edit and is a no-op when there is nothing to revert. A failed undo is retried, so it must be idempotent too.
 

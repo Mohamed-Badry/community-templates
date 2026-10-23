@@ -46,6 +46,7 @@ ENTRY_FIELDS = {
     "colors_to_compare",
     "index",
     "enabled",
+    "gtk_extension",
 }
 
 # Named built-ins run inside noctalia after the template write (not shell).
@@ -53,6 +54,21 @@ ENTRY_FIELDS = {
 POST_ACTIONS = {
     "firefox-theme",
 }
+
+# A GTK extension ships app-scoped CSS that noctalia's built-in GTK template loads. Noctalia
+# owns its output and the import, so the entry may not choose an output or run anything.
+GTK_EXTENSION_TOOLKITS = {"gtk3", "gtk4"}
+GTK_EXTENSION_FORBIDDEN = (
+    "output_path",
+    "output_path_dynamic",
+    "pre_hook",
+    "post_hook",
+    "undo_hook",
+    "post_action",
+    "requires_path",
+    "hook_async",
+)
+SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 # `{{ config_dir }}` in a hook or a dynamic command resolves to the template's own
 # cached directory, so whatever follows it has to be a file this template ships.
@@ -178,21 +194,24 @@ class Validator:
         if not has_input:
             self.add_error(manifest_path, f"{context}: needs input_path, input_path_modes, or input_path_dynamic")
 
-        # Output: a path, a list of paths, or a command that prints them.
-        output_path = entry.get("output_path")
-        if output_path is not None:
-            values = output_path if isinstance(output_path, list) else [output_path]
-            if not values:
-                self.add_error(manifest_path, f"{context}: output_path must not be empty")
-            for value in values:
-                if not is_non_empty_string(value):
-                    self.add_error(manifest_path, f"{context}: every output_path must be a non-empty string")
+        if "gtk_extension" in entry:
+            self.validate_gtk_extension(manifest_path, context, name, entry)
+        else:
+            # Output: a path, a list of paths, or a command that prints them.
+            output_path = entry.get("output_path")
+            if output_path is not None:
+                values = output_path if isinstance(output_path, list) else [output_path]
+                if not values:
+                    self.add_error(manifest_path, f"{context}: output_path must not be empty")
+                for value in values:
+                    if not is_non_empty_string(value):
+                        self.add_error(manifest_path, f"{context}: every output_path must be a non-empty string")
 
-        if "output_path_dynamic" in entry and not is_non_empty_string(entry["output_path_dynamic"]):
-            self.add_error(manifest_path, f"{context}: output_path_dynamic must be a non-empty string")
+            if "output_path_dynamic" in entry and not is_non_empty_string(entry["output_path_dynamic"]):
+                self.add_error(manifest_path, f"{context}: output_path_dynamic must be a non-empty string")
 
-        if output_path is None and "output_path_dynamic" not in entry:
-            self.add_error(manifest_path, f"{context}: needs output_path or output_path_dynamic")
+            if output_path is None and "output_path_dynamic" not in entry:
+                self.add_error(manifest_path, f"{context}: needs output_path or output_path_dynamic")
 
         if "requires_path" in entry and not is_non_empty_string(entry["requires_path"]):
             self.add_error(manifest_path, f"{context}: requires_path must be a non-empty string")
@@ -224,6 +243,23 @@ class Validator:
             command = entry.get(field)
             if is_non_empty_string(command):
                 self.validate_config_dir_refs(manifest_path, context, field, command)
+
+    def validate_gtk_extension(self, manifest_path: Path, context: str, name: str, entry: dict[str, Any]) -> None:
+        toolkit = entry["gtk_extension"]
+        if toolkit not in GTK_EXTENSION_TOOLKITS:
+            valid = ", ".join(sorted(GTK_EXTENSION_TOOLKITS))
+            self.add_error(manifest_path, f"{context}: gtk_extension must be one of: {valid}")
+        if not SAFE_NAME_RE.match(name):
+            self.add_error(manifest_path, f"{context}: a GTK extension entry id may only use letters, digits, '-' and '_'")
+        for field in GTK_EXTENSION_FORBIDDEN:
+            if field in entry:
+                self.add_error(
+                    manifest_path,
+                    f"{context}: a GTK extension must not set {field}; noctalia writes and loads the CSS itself",
+                )
+        input_path = entry.get("input_path")
+        if not (is_non_empty_string(input_path) and input_path.endswith(".css")):
+            self.add_error(manifest_path, f"{context}: a GTK extension needs a .css input_path")
 
     def validate_entries(self, manifest_path: Path, manifest: dict[str, Any]) -> None:
         templates = manifest.get("templates")
