@@ -1,25 +1,20 @@
 # Thunar
 
 This template themes Thunar's GTK 3 interface with the active Noctalia palette. It colors the
-window, sidebar, file view, selection states, location buttons, scrollbars, and menus. The CSS
-only targets Thunar widgets; it does not change GTK layout, spacing, or other applications.
+window, sidebar, file view, selection states, location buttons, scrollbars, tabs, and menus. The CSS
+only targets Thunar widgets (`window.thunar`, `.thunar`); it does not change GTK layout, spacing,
+or affect other applications.
 
-Thunar loads per-user GTK 3 overrides from `$XDG_CONFIG_HOME/gtk-3.0/gtk.css`. The template writes
-its colors to `$XDG_CONFIG_HOME/gtk-3.0/noctalia-thunar.css`, then `apply.sh` adds an import for
-that file to `gtk.css`. Restart Thunar after applying the template to see the colors.
+## How it works
 
-## Hook behavior
+This template ships as a native Noctalia **GTK 3 extension** (`gtk_extension = "gtk3"`). Noctalia
+renders the stylesheet into its `noctalia-extensions/` directory next to `gtk.css` and imports it
+automatically through the built-in GTK 3 template.
 
-The hook creates the GTK 3 config directory and `gtk.css` if they do not exist. It adds the import
-only once and preserves existing stylesheet contents. If `gtk.css` is a symlink, such as a
-Home Manager managed file, the hook replaces the symlink with a writable local copy containing
-the same contents and the new import; the linked source is left untouched. To keep a managed
-stylesheet, add `@import url("noctalia-thunar.css");` to its source instead. The hook recognizes
-that import and then leaves `gtk.css` unchanged.
-
-Disabling the template runs `undo.sh`, which removes the `@import` from `gtk.css` (leaving the rest
-of your stylesheet intact) and deletes `noctalia-thunar.css`. If `gtk.css` is a read-only managed symlink
-(such as under Home Manager), the hook leaves the symlink untouched.
+Because it is managed directly by Noctalia's GTK template:
+- It requires no hooks and never touches or rewrites your personal `gtk.css`.
+- It loads automatically whenever Noctalia's GTK 3 theming is active, and unloads cleanly when
+  disabled.
 
 ## Menus and context menus
 
@@ -31,4 +26,5 @@ In GTK 3, menus follow two distinct paths:
 
 - Thunar must use GTK 3. The selectors are based on and visually verified against
   Thunar 4.20.9 (Xfce 4.20).
-- No additional Thunar setup is needed. Enable the template in Noctalia's Settings → Templates.
+- Noctalia's built-in GTK 3 template must be enabled for GTK extensions to load.
+- Restart Thunar (`thunar -q && thunar`) after applying to pick up stylesheet changes.
